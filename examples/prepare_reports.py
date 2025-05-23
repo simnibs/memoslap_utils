@@ -16,7 +16,7 @@ not be necessary as long as you are doing the standard analyses.
 import sys
 import os
 from os.path import join
-sys.path.append("/home/jev/memoslap") # change to your memoslap directory
+sys.path.append("/home/jev/memoslap_utils") # change to your memoslap directory
 
 import argparse
 import simnibs_memoslap_utils as smu
