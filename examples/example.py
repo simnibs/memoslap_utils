@@ -8,7 +8,7 @@ Created on Fri Mar 31 11:12:54 2023
 import sys
 # --------------------------------------------------
 # NOTE: Update this path to fit to your installation
-path_to_utils = 'C:/Users/axthi/simnibsN/memoslap/'
+path_to_utils = 'C:/Users/axthi/simnibsN/memoslap_utils/'
 sys.path.append(path_to_utils)
 
 import simnibs_memoslap_utils as smu 
