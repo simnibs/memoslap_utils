@@ -8,7 +8,7 @@ Created on Fri Mar 31 11:12:54 2023
 import sys
 import argparse
 
-path_to_utils = 'C:/Users/axthi/simnibsN/memoslap/' # NOTE: change to your memoslap git directory
+path_to_utils = 'C:/Users/axthi/simnibsN/memoslap_utils/' # NOTE: change to your memoslap git directory
 sys.path.append(path_to_utils)
 
 import simnibs_memoslap_utils as smu 
