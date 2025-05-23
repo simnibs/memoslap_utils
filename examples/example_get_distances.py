@@ -8,7 +8,7 @@ import sys
 
 # --------------------------------------------------
 # NOTE: Update this path to fit to your installation
-path_to_utils = 'C:/Users/axthi/simnibsN/memoslap/'
+path_to_utils = 'C:/Users/axthi/simnibsN/memoslap_utils/'
 sys.path.append(path_to_utils)
 from simnibs_memoslap_utils.utils import get_scalp_skull_csf_thickness_for_subject
 
