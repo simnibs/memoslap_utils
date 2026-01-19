@@ -8,6 +8,7 @@ import numpy as np
 import nibabel as nib
 import gc
 import os
+import pickle
 from copy import deepcopy
 from scipy.spatial.distance import cdist
 from simnibs import mesh_io, file_finder
@@ -522,6 +523,108 @@ def get_get_tissue_volumes_for_subject(subject_path, add_cerebellum=True, radius
     vol_SCALP = {'target' : v_SCALP[:len_target], 'control' : v_SCALP[len_target:]}
     
     return vol_WM, vol_GM, vol_CSF, vol_BONE, vol_SCALP
+
+
+def get_percentiles(results_folder, percentiles=[95]):
+    """
+    get percentiles of E_magn, E_normal, ... in the ROI
+
+    Parameters
+    ----------
+    results_folder : string
+        path to a folder with simulation results.
+    percentiles : list, optional
+        list of percentiles to be evaluated. The default is [95].
+
+    Returns
+    -------
+    dictionary with the following keys:
+        'radii': radii for the montages stored in the results_folder
+        percentiles[0]: results for the first percentile in the list
+        etc.
+    """
+    results_pkl_file = os.path.join(results_folder, 'simnibs_memoslap_results.pkl')
+    
+    with open(results_pkl_file, 'rb') as file:
+        res_list = pickle.load(file)[3]
+    
+    perc_list = dict()
+    perc_list['radii'] = list(res_list.keys())
+    for p in percentiles:
+        perc_list[p] = dict()
+    
+    for radius, fname_msh in res_list.items():
+        # ensure that the mesh-file can be loaded in case the folder was moved
+        fname_msh = os.path.join(results_folder, os.path.basename(fname_msh))
+        m = mesh_io.read_msh(fname_msh)
+        #nd_sze = m.nodes_volumes_or_areas().value
+        idx_mask = m.field['mask'].value > 0
+            
+        res_quantities = list(m.field.keys())
+        res_quantities.remove('mask')
+        for q in res_quantities:
+            for prc in percentiles:
+                res = np.percentile(m.field[q].value[idx_mask], prc)
+                #res = np.percentile(m.field[q].value[idx_mask], prc, weights=nd_sze[idx_mask]) # untested, requires numpy 2
+                
+                if not q in perc_list[prc]:
+                    perc_list[prc][q] = [res]
+                else:
+                    perc_list[prc][q].append(res)
+
+    return perc_list
+
+
+def get_focality_for_fixed_threshold(results_folder, thresholds=[0.2]):
+    """
+    get focality for fixed threshold values
+    Focality is defined as area outside the ROI that exceeds
+    the given threshold values
+
+    Parameters
+    ----------
+    results_folder : string
+        path to a folder with simulation results.
+    thresholds : list, optional
+        list of thresholds to be evaluated. The default is [0.2].
+
+    Returns
+    -------
+    dictionary with the following keys:
+        'radii': radii for the montages stored in the results_folder
+        thresholds[0]: results for the first threshold in the list
+        etc.
+    """
+    results_pkl_file = os.path.join(results_folder, 'simnibs_memoslap_results.pkl')
+    
+    with open(results_pkl_file, 'rb') as file:
+        res_list = pickle.load(file)[3]
+    
+    foc_list = dict()
+    foc_list['radii'] = list(res_list.keys())
+    for p in thresholds:
+        foc_list[p] = dict()
+    
+    for radius, fname_msh in res_list.items():
+        # ensure that the mesh-file can be loaded in case the folder was moved
+        fname_msh = os.path.join(results_folder, os.path.basename(fname_msh))
+        m = mesh_io.read_msh(fname_msh)
+        nd_sze = m.nodes_volumes_or_areas().value
+        idx_mask = m.field['mask'].value > 0
+            
+        res_quantities = list(m.field.keys())
+        res_quantities.remove('mask')
+        for q in res_quantities:
+            for thr in thresholds:
+                idx = (m.field[q].value > thr) & ~idx_mask
+                foc = np.sum(nd_sze[ idx ])
+
+                if not q in foc_list[thr]:
+                    foc_list[thr][q] = [foc]
+                else:
+                    foc_list[thr][q].append(foc)
+                    
+    return foc_list
 
 
 def write_roi_annots(subject_path, results_basepath='.', add_cerebellum=True, write_nii=True):

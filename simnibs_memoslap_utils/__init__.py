@@ -4,6 +4,7 @@ from .run import run
 from .preparation import create_cereb_surface, get_central_gm_with_mask, get_center_pos
 from .simulation import run_FEMs, analyse_simus
 from .reporting import placement_guide, internal_report
+from .run_line import run_line
 
 from simnibs import __version__
 isSimNIBS4 = int(__version__[0])>3

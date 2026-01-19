@@ -23,11 +23,16 @@ version = [int(x) for x in __version__.split('.')[:3]]
 isSimNIBS4 = version[0]>3
 isSimNIBS4xx = (version[1]>0 or version[2]>0) and isSimNIBS4
 isSimNIBS402 = (version[1]>0 or (version[1]==0 and version[2]>1)) and isSimNIBS4
+isSimNIBS46x = version[1]>5 and isSimNIBS4
 if isSimNIBS4:
     from simnibs.utils import transformations
-    from simnibs.utils.file_finder import get_reference_surf
     from simnibs.segmentation.charm_utils import _get_largest_components
     from simnibs.segmentation.marching_cube import marching_cube
+    if isSimNIBS46x:
+        from simnibs.utils.file_finder import get_fsaverage_template as get_reference_surf
+        import cortech
+    else:
+        from simnibs.utils.file_finder import get_reference_surf
 else:
     from simnibs.msh import transformations
     from simnibs.utils.file_finder import templates
@@ -68,10 +73,17 @@ def _convert_fsavg_mask(fn_mask_fsspace, hemi, subpath):
         idx_mask = nib.freesurfer.io.read_morph_data(fn_mask_fsspace)
 
     if isSimNIBS4xx:
-        morph = transformations.SurfaceMorph(surf_sphere, 
-                                             mesh_io.read_gifti_surface(fn_reg), 
-                                             method="nearest")
-        idx_mask = morph.transform(idx_mask) > 0.0001
+        if isSimNIBS46x:
+            sph_reg = cortech.Sphere(surf_sphere.nodes.node_coord, surf_sphere.elm.node_number_list[:,:3]-1)
+            surf_ref = mesh_io.read_gifti_surface(fn_reg)
+            sph_ref = cortech.Sphere(surf_ref.nodes.node_coord, surf_ref.elm.node_number_list[:,:3]-1)
+            sph_reg.project(sph_ref)
+            idx_mask = sph_reg.resample(idx_mask) > 0.0001
+        else:
+            morph = transformations.SurfaceMorph(surf_sphere, 
+                                                 mesh_io.read_gifti_surface(fn_reg), 
+                                                 method="nearest")
+            idx_mask = morph.transform(idx_mask) > 0.0001
     else:
         idx_mask, _ = transformations._surf2surf(
                     idx_mask,
@@ -101,7 +113,6 @@ def _map_roi(subj_files, fname_roi):
                                 intorder=0
                                 )
     transformed_data = np.squeeze(transformed_data)
-
     return transformed_data, target_im.affine
 
 
@@ -111,7 +122,7 @@ def _convert_MNImask(fn_mask, m, subpath):
     subj_files = SubjectFiles(subpath = subpath)     
     # convert to subject space
     roi_buffer, roi_affine = _map_roi(subj_files, fn_mask)
-    roi_buffer = roi_buffer.astype(np.uint16)
+    roi_buffer = np.round(roi_buffer).astype(np.uint16)
     # map on nodes
     nd = mesh_io.NodeData.from_data_grid(m, roi_buffer, roi_affine)
     nd.value = nd.value > 0
@@ -270,13 +281,14 @@ def _relabel_internal_air(m, label_skin = 1005, label_new = 1099, keep_largest=T
     idx_innerAirTri *= ~np.any(np.in1d(m.elm.node_number_list, idx_skinNodes).reshape(-1, 4), axis=1)
     
     m.elm.tag1[idx_innerAirTri] = label_new
-    
+   
     if keep_largest:
         c=m.elm.connected_components(m.elm.tag1 == label_skin)
         idx = c.index(max(c, key=len))
         c.pop(idx)
-        c = np.array([item for row in c for item in row]) - 1
-        m.elm.tag1[c] = label_new
+        if c:
+            c = np.array([item for row in c for item in row]) - 1
+            m.elm.tag1[c] = label_new
     
     m.elm.tag2[:] = m.elm.tag1
     return m
@@ -364,7 +376,7 @@ def get_center_pos(m_surf, subject_path, condition, el_name=None):
     
     # load head mesh
     m = mesh_io.read_msh(subject_files.fnamehead)
-    if isSimNIBS4:
+    if isSimNIBS4 and not any(m.elm.tag1 == 1099):
         # relabel skin in internal air cavities
         m = _relabel_internal_air(m)
         

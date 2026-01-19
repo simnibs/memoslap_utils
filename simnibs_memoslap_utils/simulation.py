@@ -19,9 +19,14 @@ version = [int(x) for x in __version__.split('.')[:3]]
 isSimNIBS4 = version[0]>3
 isSimNIBS4xx = (version[1]>0 or version[2]>0) and isSimNIBS4
 isSimNIBS402 = (version[1]>0 or (version[1]==0 and version[2]>1)) and isSimNIBS4
+isSimNIBS46x = version[1]>5 and isSimNIBS4
 if isSimNIBS4:
     from simnibs.utils import transformations
-    from simnibs.utils.file_finder import get_reference_surf
+    if isSimNIBS46x:
+        from simnibs.utils.file_finder import get_fsaverage_template as get_reference_surf
+        import cortech
+    else:
+        from simnibs.utils.file_finder import get_reference_surf
 else:
     from simnibs.msh import transformations
     from simnibs.utils.file_finder import templates
@@ -317,15 +322,23 @@ def _map_results_to_fsavg(subject_path,res_list,out_folder):
             assert m_hemi.elm.nr == reg_surf[hemi].elm.nr
             
             if isSimNIBS4xx:
-                morph = transformations.SurfaceMorph(reg_surf[hemi], 
-                                                     ref_surf[hemi], 
-                                                     method="linear")
+                if isSimNIBS46x:
+                    sph_reg = cortech.Sphere(reg_surf[hemi].nodes.node_coord, reg_surf[hemi].elm.node_number_list[:,:3]-1)
+                    sph_ref = cortech.Sphere(ref_surf[hemi].nodes.node_coord, ref_surf[hemi].elm.node_number_list[:,:3]-1)
+                    sph_reg.project(sph_ref)
+                else:
+                    morph = transformations.SurfaceMorph(reg_surf[hemi], 
+                                                         ref_surf[hemi], 
+                                                         method="linear")
             else:
                 kdtree = None
                 
             for name, data in m_hemi.field.items():
                 if isSimNIBS4xx:
-                    data_fsavg = morph.transform(data.value)
+                    if isSimNIBS46x:
+                        data_fsavg = sph_reg.resample(data.value)
+                    else:
+                        data_fsavg = morph.transform(data.value)
                 else:
                     data_fsavg, kdtree = transformations._surf2surf(data.value,
                                                           reg_surf[hemi],

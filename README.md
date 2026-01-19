@@ -23,3 +23,6 @@ They need a working SimNIBS installation (http://www.simnibs.org). You need to p
 * focality values will be different for add_cerebellum=True versus add_cerebellum=False, as for the former case the area of the cerebellum surface will be included in the calculations
 * when running with simnibs3, set add_cerebellum=False
 * it should run with simnibs3, but is not tested yet (good luck!)
+* meshio and pyvista need to be added to the simnibs environment
+* Update 13/10/2025: Per default, SimNIBS4 head meshes in their m2m-folders will be replaced by versions in which internal air surfaces are relabled to 1099. Call run with fix_internal_air=False to prevent this.
+* Update 19/01/2026: updated code to run with SimNIBS v4.6; minor bug fix related to ROIs defined as MNI volume masks

@@ -9,14 +9,16 @@ import re
 import os
 import logging
 import pickle
+import shutil
 
-from .preparation import create_cereb_surface, get_central_gm_with_mask, get_center_pos
+from .preparation import create_cereb_surface, get_central_gm_with_mask, get_center_pos, _relabel_internal_air
 from .simulation import run_FEMs, analyse_simus, _create_results_path
 from .reporting import internal_report, placement_guide
 
-from simnibs import __version__
+from simnibs import __version__, mesh_io
 from simnibs.utils import simnibs_logger
 from simnibs.utils.simnibs_logger import logger
+from simnibs.utils.file_finder import SubjectFiles
 
 import datetime
 
@@ -67,7 +69,7 @@ def _stop_logger(logfile):
         f.close()
 
 
-def run(subject_path, project, results_basepath='.', add_cerebellum=True, map_to_fsavg=False):
+def run(subject_path, project, results_basepath='.', add_cerebellum=True, map_to_fsavg=False, fix_internal_air=True):
     """
     wrapper function around the following steps:
         * create a coarse cerebellum central gm surface and add
@@ -92,7 +94,11 @@ def run(subject_path, project, results_basepath='.', add_cerebellum=True, map_to
     map_to_fsavg : bool, optional
         set to True for transforming the results to fsaverage space
         (only lh and rh). The standard is False.
-
+    fix_internal_air : bool, optional
+        when True, SimNIBS4 head meshes in their m2m-folders will be replaced
+        by versions in which internal air surfaces are relabled to 1099.
+        The default is True.
+        
     Returns
     -------
     res_list : dict
@@ -121,6 +127,20 @@ def run(subject_path, project, results_basepath='.', add_cerebellum=True, map_to
         logger.info('Creating cerebellum central gm surface...')
         create_cereb_surface(subject_path)
 
+    # relabel internal air in SimNIBS4 head meshes
+    if fix_internal_air and isSimNIBS4:
+        logger.info("Relabeling internal air boundaries")
+        subj_files = SubjectFiles(subpath = subject_path)
+        m = mesh_io.read_msh(subj_files.fnamehead)
+        
+        if any(m.elm.tag1 == 1099):
+            logger.info("internal air is already relabeled, skipping...")
+        else:
+            shutil.copyfile(subj_files.fnamehead, 
+                            os.path.splitext(subj_files.fnamehead)[0] + '_org.msh')
+            m = _relabel_internal_air(m)
+            mesh_io.write_msh(m,subj_files.fnamehead)
+            
     # load middle gm surfaces and add the mask as node data
     logger.info('Loading central gm surfaces and mapping mask onto surfaces...')
     m_surf = get_central_gm_with_mask(subject_path,
